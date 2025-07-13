@@ -1,0 +1,13 @@
+.{
+    .name = .isbn,
+    .version = "0.0.0",
+    .fingerprint = 0xcc1cf4e6f2ea0e6a, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.0-dev.929+31e46be74",
+    .dependencies = .{
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
