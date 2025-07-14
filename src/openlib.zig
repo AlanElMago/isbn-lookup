@@ -116,6 +116,8 @@ fn fetchJson(allocator: std.mem.Allocator, url: []const u8) !FetchResponse {
     };
 
     var client: http.Client = .{ .allocator = allocator };
+    defer client.deinit();
+
     const result = try client.fetch(.{
         .server_header_buffer = server_header_buffer[0..],
         .response_storage = .{ .dynamic = &res_body },
