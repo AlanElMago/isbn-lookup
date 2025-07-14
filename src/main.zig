@@ -3,7 +3,7 @@ const http = std.http;
 const json = std.json;
 
 const openlib = @import("openlib");
-
+const OpenLibraryAuthor = openlib.OpenLibraryAuthor;
 const OpenLibraryBook = openlib.OpenLibraryBook;
 const GetOpenLibraryBookResponse = openlib.GetOpenLibraryBookResponse;
 
@@ -13,6 +13,31 @@ fn printUsage(stdout: std.io.AnyWriter) !void {
     ;
 
     try stdout.print("{s}", .{message});
+}
+
+fn printBookInfo(
+    stdout: std.io.AnyWriter,
+    book: OpenLibraryBook,
+    authors: std.ArrayList(OpenLibraryAuthor)
+) !void {
+    try stdout.print("Title: {s}\n", .{book.title});
+
+    try stdout.print("Author(s):\n", .{});
+    for (authors.items) |author| {
+        try stdout.print("- {s}\n", .{author.name});
+    }
+
+    try stdout.print("ISBN-13:\n", .{});
+    for (book.isbn_13) |isbn_13| {
+        try stdout.print("- {s}\n", .{isbn_13});
+    }
+
+    try stdout.print("Publisher(s):\n", .{});
+    for (book.publishers) |publisher| {
+        try stdout.print("- {s}\n", .{publisher});
+    }
+
+    try stdout.print("Publish Date: {s}\n", .{book.publish_date});
 }
 
 pub fn main() !void {
@@ -42,29 +67,28 @@ pub fn main() !void {
     }
 
     const book = res.object.?.book;
-    const author_name: []const u8 = blk: {
-        const author_key = book.authors[0].key;
+    var authors = try std.ArrayList(OpenLibraryAuthor)
+        .initCapacity(allocator, 10);
 
-        if (std.mem.eql(u8, author_key, "N/A")) {
-            break :blk "N/A";
-        }
+    if (std.mem.eql(u8, book.authors[0].key, "N/A")) {
+        try authors.append(.{ .name = "N/A" });
+        try printBookInfo(stdout.any(), book, authors);
+        return;
+    }
 
-        res = try openlib.getOpenLibraryAuthor(allocator, author_key);
+    for (book.authors) |author| {
+        res = try openlib.getOpenLibraryAuthor(allocator, author.key);
 
         if (res.status != http.Status.ok) {
             try stderr.print("Error fetching author data: {d} ({s})\n", .{
                 @intFromEnum(res.status),
                 res.status.phrase() orelse "Unknown status",
             });
-            break :blk "N/A";
+            return;
         }
 
-        break :blk res.object.?.author.name;
-    };
+        try authors.append(res.object.?.author);
+    }
 
-    try stdout.print("Title: {s}\n",        .{book.title});
-    try stdout.print("Author: {s}\n",       .{author_name});
-    try stdout.print("ISBN-13: {s}\n",      .{book.isbn_13[0]});
-    try stdout.print("Publishers: {s}\n",   .{book.publishers[0]});
-    try stdout.print("Publish Date: {s}\n", .{book.publish_date});
+    try printBookInfo(stdout.any(), book, authors);
 }
