@@ -1,6 +1,6 @@
 const std = @import("std");
-const json = std.json;
 const http = std.http;
+const json = std.json;
 
 pub const OPEN_LIBRARY_URL = "https://openlibrary.org";
 pub const SERVER_HEADER_BUFFER_SIZE = 1024;
@@ -16,18 +16,16 @@ pub const OpenLibraryAuthor = struct {
 
     name: []const u8,
 
-    pub fn initFromJsonParsed(allocator: std.mem.Allocator, parsed: json.Parsed(json.Value)) !Self {
+    pub fn initFromJsonParsed(
+        allocator: std.mem.Allocator,
+        parsed: json.Parsed(json.Value)
+    ) !Self {
         const root = parsed.value;
-        var author: Self = .{
-            .name = undefined
-        };
+        var author: Self = .{ .name = undefined };
 
         if (root.object.get("name")) |name| {
             author.name = try json.parseFromValueLeaky(
-                []const u8, 
-                allocator, 
-                name,
-                .{},
+                []const u8, allocator, name, .{},
             );
         } else {
             author.name = "N/A";
@@ -47,7 +45,10 @@ pub const OpenLibraryBook = struct {
     publish_date: []const u8,
     authors:      []const AuthorKey,
 
-    pub fn initFromJsonParsed(allocator: std.mem.Allocator, parsed: json.Parsed(json.Value)) !Self {
+    pub fn initFromJsonParsed(
+        allocator: std.mem.Allocator,
+        parsed: json.Parsed(json.Value)
+    ) !Self {
         const root = parsed.value;
         var book: Self = .{
             .title = undefined,
@@ -59,10 +60,7 @@ pub const OpenLibraryBook = struct {
 
         if (root.object.get("title")) |title| {
             book.title = try json.parseFromValueLeaky(
-                []const u8,
-                allocator,
-                title,
-                .{},
+                []const u8, allocator, title, .{},
             );
         } else {
             book.title = "N/A";
@@ -70,10 +68,7 @@ pub const OpenLibraryBook = struct {
 
         if (root.object.get("isbn_13")) |isbn_13| {
             book.isbn_13 = try json.parseFromValueLeaky(
-                []const []const u8,
-                allocator,
-                isbn_13,
-                .{},
+                []const []const u8, allocator, isbn_13, .{},
             );
         } else {
             book.isbn_13 = &.{ "N/A" };
@@ -81,10 +76,7 @@ pub const OpenLibraryBook = struct {
 
         if (root.object.get("publishers")) |publishers| {
             book.publishers = try json.parseFromValueLeaky(
-                []const []const u8,
-                allocator,
-                publishers,
-                .{},
+                []const []const u8, allocator, publishers, .{},
             );
         } else {
             book.publishers = &.{ "N/A" };
@@ -92,10 +84,7 @@ pub const OpenLibraryBook = struct {
 
         if (root.object.get("publish_date")) |publish_date| {
             book.publish_date = try json.parseFromValueLeaky(
-                []const u8,
-                allocator,
-                publish_date,
-                .{},
+                []const u8, allocator, publish_date, .{},
             );
         } else {
             book.publish_date = "N/A";
@@ -103,10 +92,7 @@ pub const OpenLibraryBook = struct {
 
         if (root.object.get("authors")) |authors| {
             book.authors = try json.parseFromValueLeaky(
-                []AuthorKey,
-                allocator,
-                authors,
-                .{},
+                []AuthorKey, allocator, authors, .{},
             );
         } else {
             book.authors = &.{ .{ .key = "N/A" } };
@@ -117,28 +103,25 @@ pub const OpenLibraryBook = struct {
 };
 
 pub const GetOpenLibraryResponse = struct {
-    object: ?union {
-        book: OpenLibraryBook,
-        author: OpenLibraryAuthor,
-    },
-    status: std.http.Status,
+    object: ?union { author: OpenLibraryAuthor, book: OpenLibraryBook },
+    status: http.Status,
 };
 
 fn fetchJson(allocator: std.mem.Allocator, url: []const u8) !FetchResponse {
     const uri = try std.Uri.parse(url);
     var server_header_buffer: [SERVER_HEADER_BUFFER_SIZE]u8 = undefined;
     var res_body = std.ArrayList(u8).init(allocator);
-    const extra_headers = [_]std.http.Header{
+    const extra_headers = [_]http.Header{
         .{ .name = "accept", .value = "application/json" }
     };
 
-    var client: std.http.Client = .{ .allocator = allocator };
+    var client: http.Client = .{ .allocator = allocator };
     const result = try client.fetch(.{
         .server_header_buffer = server_header_buffer[0..],
         .response_storage = .{ .dynamic = &res_body },
         .max_append_size = MAX_APPEND_SIZE,
         .location = .{ .uri = uri },
-        .method = std.http.Method.GET,
+        .method = http.Method.GET,
         .extra_headers = extra_headers[0..],
     });
 
@@ -149,22 +132,17 @@ pub fn getOpenLibraryBook(
     allocator: std.mem.Allocator,
     isbn: []const u8
 ) !GetOpenLibraryResponse {
-    const url = try std.mem.concat(
-        allocator,
-        u8,
-        &[_][]const u8{ OPEN_LIBRARY_URL, "/isbn/", isbn },
+    const url: []u8 = try std.mem.concat(
+        allocator, u8, &[_][]const u8{ OPEN_LIBRARY_URL, "/isbn/", isbn },
     );
 
-    const res = try fetchJson(allocator, url);
+    const res: FetchResponse = try fetchJson(allocator, url);
     if (res.status != http.Status.ok) {
         return .{ .object = null, .status = res.status };
     }
 
     const parsed: json.Parsed(json.Value) = try json.parseFromSlice(
-        json.Value,
-        allocator,
-        res.body.items,
-        .{}
+        json.Value, allocator, res.body.items, .{}
     );
     const book = try OpenLibraryBook.initFromJsonParsed(allocator, parsed);
 
@@ -175,22 +153,17 @@ pub fn getOpenLibraryAuthor(
     allocator: std.mem.Allocator,
     key: []const u8,
 ) !GetOpenLibraryResponse {
-    const url = try std.mem.concat(
-        allocator,
-        u8,
-        &[_][]const u8{ OPEN_LIBRARY_URL, key}
+    const url: []u8 = try std.mem.concat(
+        allocator, u8, &[_][]const u8{ OPEN_LIBRARY_URL, key }
     );
 
-    const res = try fetchJson(allocator, url);
+    const res: FetchResponse = try fetchJson(allocator, url);
     if (res.status != http.Status.ok) {
         return .{ .object = null, .status = res.status };
     }
 
     const parsed: json.Parsed(json.Value) = try json.parseFromSlice(
-        json.Value,
-        allocator,
-        res.body.items,
-        .{}
+        json.Value, allocator, res.body.items, .{}
     );
     const author = try OpenLibraryAuthor.initFromJsonParsed(allocator, parsed);
 

@@ -1,11 +1,10 @@
 const std = @import("std");
 const http = std.http;
-const json = std.json;
 
 const openlib = @import("openlib");
+const GetOpenLibraryResponse = openlib.GetOpenLibraryResponse;
 const OpenLibraryAuthor = openlib.OpenLibraryAuthor;
 const OpenLibraryBook = openlib.OpenLibraryBook;
-const GetOpenLibraryBookResponse = openlib.GetOpenLibraryBookResponse;
 
 fn printUsage(stdout: std.io.AnyWriter) !void {
     const message =
@@ -49,14 +48,16 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const args = try std.process.argsAlloc(allocator);
+    const args: [][:0]u8 = try std.process.argsAlloc(allocator);
     if (args.len != 2) {
         try printUsage(stdout.any());
         return;
     }
 
     const isbn: []const u8 = args[1];
-    var res = try openlib.getOpenLibraryBook(allocator, isbn);
+    var res: GetOpenLibraryResponse = try openlib.getOpenLibraryBook(
+        allocator, isbn
+    );
 
     if (res.status != http.Status.ok) {
         try stderr.print("Error fetching ISBN data: {d} ({s})\n", .{
@@ -66,9 +67,10 @@ pub fn main() !void {
         return;
     }
 
-    const book = res.object.?.book;
-    var authors = try std.ArrayList(OpenLibraryAuthor)
-        .initCapacity(allocator, 10);
+    const book: OpenLibraryBook = res.object.?.book;
+    var authors = try std.ArrayList(OpenLibraryAuthor).initCapacity(
+        allocator, 10
+    );
 
     if (std.mem.eql(u8, book.authors[0].key, "N/A")) {
         try authors.append(.{ .name = "N/A" });
