@@ -9,6 +9,7 @@ const OpenLibraryBook = openlib.OpenLibraryBook;
 fn printUsage(stdout: std.io.AnyWriter) !void {
     const message =
     \\ Usage: isbn [isbn]
+    \\
     ;
 
     try stdout.print("{s}", .{message});
