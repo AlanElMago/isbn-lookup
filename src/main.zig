@@ -23,6 +23,10 @@ fn printBookInfo(
 ) !void {
     try stdout.print("Title: {s}\n", .{book.title});
 
+    if (!std.mem.eql(u8, book.subtitle, "N/A")) {
+        try stdout.print("Subtitle: {s}\n", .{book.subtitle});
+    }
+
     try stdout.print("Author(s):\n", .{});
     for (authors.items) |author| {
         try stdout.print("- {s}\n", .{author.name});

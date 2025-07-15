@@ -40,6 +40,7 @@ pub const OpenLibraryBook = struct {
     const WorkKey = struct { key: []const u8 };
 
     title:        []const u8,
+    subtitle:     []const u8,
     isbn_13:      []const []const u8,
     publishers:   []const []const u8,
     publish_date: []const u8,
@@ -52,6 +53,7 @@ pub const OpenLibraryBook = struct {
         const root = parsed.value;
         var book: Self = .{
             .title = undefined,
+            .subtitle = undefined,
             .isbn_13 = undefined,
             .publishers = undefined,
             .publish_date = undefined,
@@ -64,6 +66,14 @@ pub const OpenLibraryBook = struct {
             );
         } else {
             book.title = "N/A";
+        }
+
+        if (root.object.get("subtitle")) |subtitle| {
+            book.subtitle = try json.parseFromValueLeaky(
+                []const u8, allocator, subtitle, .{},
+            );
+        } else {
+            book.subtitle = "N/A";
         }
 
         if (root.object.get("isbn_13")) |isbn_13| {
