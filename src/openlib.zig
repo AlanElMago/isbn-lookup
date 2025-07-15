@@ -8,7 +8,7 @@ pub const MAX_APPEND_SIZE = 65536;
 
 const FetchResponse = struct {
     status: http.Status,
-    body: *std.ArrayList(u8),
+    body: std.ArrayList(u8),
 };
 
 pub const OpenLibraryAuthor = struct {
@@ -172,7 +172,7 @@ fn fetchJson(allocator: std.mem.Allocator, url: []const u8) !FetchResponse {
         .extra_headers = extra_headers[0..],
     });
 
-    return .{ .status = result.status, .body = &res_body };
+    return .{ .status = result.status, .body = res_body };
 }
 
 pub fn getOpenLibraryBook(
