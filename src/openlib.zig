@@ -37,13 +37,13 @@ pub const OpenLibraryAuthor = struct {
 
 pub const OpenLibraryBook = struct {
     const Self = @This();
-    const AuthorKey = struct { key: []const u8 };
+    const WorkKey = struct { key: []const u8 };
 
     title:        []const u8,
     isbn_13:      []const []const u8,
     publishers:   []const []const u8,
     publish_date: []const u8,
-    authors:      []const AuthorKey,
+    works:        []const WorkKey,
 
     pub fn initFromJsonParsed(
         allocator: std.mem.Allocator,
@@ -55,7 +55,7 @@ pub const OpenLibraryBook = struct {
             .isbn_13 = undefined,
             .publishers = undefined,
             .publish_date = undefined,
-            .authors = undefined,
+            .works = undefined,
         };
 
         if (root.object.get("title")) |title| {
@@ -90,20 +90,55 @@ pub const OpenLibraryBook = struct {
             book.publish_date = "N/A";
         }
 
-        if (root.object.get("authors")) |authors| {
-            book.authors = try json.parseFromValueLeaky(
-                []AuthorKey, allocator, authors, .{},
+        if (root.object.get("works")) |works| {
+            book.works = try json.parseFromValueLeaky(
+                []WorkKey, allocator, works, .{},
             );
         } else {
-            book.authors = &.{ .{ .key = "N/A" } };
+            book.works = &.{ .{ .key = "N/A" } };
         }
 
         return book;
     }
 };
 
+pub const OpenLibraryWork = struct {
+    const Self = @This();
+    const AuthorKey = struct {
+        author: struct { key: []const u8 },
+        type: struct { key: []const u8 },
+    };
+
+    authors: []const AuthorKey,
+
+    pub fn initFromJsonParsed(
+        allocator: std.mem.Allocator,
+        parsed: json.Parsed(json.Value)
+    ) !Self {
+        const root = parsed.value;
+        var work: Self = .{ .authors = undefined };
+
+        if (root.object.get("authors")) |authors| {
+            work.authors = try json.parseFromValueLeaky(
+                []AuthorKey, allocator, authors, .{},
+            );
+        } else {
+            work.authors = &.{ .{
+                .author = .{ .key = "N/A" },
+                .type = .{ .key = "N/A" },
+            } };
+        }
+
+        return work;
+    }
+};
+
 pub const GetOpenLibraryResponse = struct {
-    object: ?union { author: OpenLibraryAuthor, book: OpenLibraryBook },
+    object: ?union {
+        author: OpenLibraryAuthor,
+        book: OpenLibraryBook,
+        work: OpenLibraryWork
+    },
     status: http.Status,
 };
 
@@ -170,4 +205,25 @@ pub fn getOpenLibraryAuthor(
     const author = try OpenLibraryAuthor.initFromJsonParsed(allocator, parsed);
 
     return .{ .object = .{ .author = author }, .status = res.status };
+}
+
+pub fn getOpenLibraryWork(
+    allocator: std.mem.Allocator,
+    key: []const u8,
+) !GetOpenLibraryResponse {
+    const url: []u8 = try std.mem.concat(
+        allocator, u8, &[_][]const u8{ OPEN_LIBRARY_URL, key }
+    );
+
+    const res: FetchResponse = try fetchJson(allocator, url);
+    if (res.status != http.Status.ok) {
+        return .{ .object = null, .status = res.status };
+    }
+
+    const parsed: json.Parsed(json.Value) = try json.parseFromSlice(
+        json.Value, allocator, res.body.items, .{}
+    );
+    const work = try OpenLibraryWork.initFromJsonParsed(allocator, parsed);
+
+    return .{ .object = .{ .work = work }, .status = res.status };
 }

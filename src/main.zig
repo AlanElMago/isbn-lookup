@@ -5,6 +5,7 @@ const openlib = @import("openlib");
 const GetOpenLibraryResponse = openlib.GetOpenLibraryResponse;
 const OpenLibraryAuthor = openlib.OpenLibraryAuthor;
 const OpenLibraryBook = openlib.OpenLibraryBook;
+const OpenLibraryWork = openlib.OpenLibraryWork;
 
 fn printUsage(stdout: std.io.AnyWriter) !void {
     const message =
@@ -59,7 +60,6 @@ pub fn main() !void {
     var res: GetOpenLibraryResponse = try openlib.getOpenLibraryBook(
         allocator, isbn
     );
-
     if (res.status != http.Status.ok) {
         try stderr.print("Error fetching ISBN data: {d} ({s})\n", .{
             @intFromEnum(res.status),
@@ -68,19 +68,31 @@ pub fn main() !void {
         return;
     }
 
-    const book: OpenLibraryBook = res.object.?.book;
     var authors = try std.ArrayList(OpenLibraryAuthor).initCapacity(
         allocator, 10
     );
 
-    if (std.mem.eql(u8, book.authors[0].key, "N/A")) {
+    const book: OpenLibraryBook = res.object.?.book;
+    if (std.mem.eql(u8, book.works[0].key, "N/A")) {
         try authors.append(.{ .name = "N/A" });
         try printBookInfo(stdout.any(), book, authors);
         return;
     }
 
-    for (book.authors) |author| {
-        res = try openlib.getOpenLibraryAuthor(allocator, author.key);
+    res = try openlib.getOpenLibraryWork(allocator, book.works[0].key);
+    if (res.status != http.Status.ok) {
+        try stderr.print("Error fetching work data: {d} ({s})\n", .{
+            @intFromEnum(res.status),
+            res.status.phrase() orelse "Unknown status",
+        });
+        return;
+    }
+
+    const first_work: OpenLibraryWork = res.object.?.work;
+    for (first_work.authors) |author_key| {
+        res = try openlib.getOpenLibraryAuthor(
+            allocator, author_key.author.key
+        );
 
         if (res.status != http.Status.ok) {
             try stderr.print("Error fetching author data: {d} ({s})\n", .{
